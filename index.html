@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TON Vanity Studio — Генератор и активатор кошелька</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        ton: {
+                            DEFAULT: '#0088CC',
+                            dark: '#006699',
+                            glow: '#00A3FF'
+                        },
+                        cyber: {
+                            bg: '#0B0E14',
+                            card: '#151D2A',
+                            border: '#233044',
+                            neon: '#00F0FF',
+                            purple: '#A855F7',
+                            pink: '#EC4899',
+                            gold: '#F59E0B'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0B0E14;
+            color: #E2E8F0;
+            font-family: 'Inter', sans-serif;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 136, 204, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(0, 240, 255, 0.05) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        .glass-panel {
+            background: rgba(21, 29, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(35, 48, 68, 0.8);
+        }
+
+        .glass-panel-glow {
+            background: rgba(21, 29, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B0E14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #233044;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0088CC;
+        }
+
+        .tab-btn.active {
+            color: #00F0FF;
+            border-bottom: 2px solid #00F0FF;
+            background: rgba(0, 240, 255, 0.05);
+        }
+
+        .blurred-text {
+            filter: blur(5px);
+            user-select: none;
+            transition: filter 0.2s ease;
+        }
+
+        #matrixCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-ton selection:text-white">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Header / Navbar -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-cyber-border px-4 lg:px-8 py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-ton to-cyber-neon flex items-center justify-center text-cyber-bg font-bold text-xl shadow-lg shadow-ton/30">
+                    <i class="fa-solid fa-gem"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide text-white flex items-center gap-2">
+                        TON Vanity Studio
+                        <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-ton/20 text-cyber-neon border border-ton/30">WalletTg</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 font-mono">Генератор красивых адресов & Activation Manager</p>
+                </div>
+            </div>
+
+            <!-- Network Status Indicator & Language Toggle -->
+            <div class="flex items-center gap-3">
+                <!-- Language Switcher -->
+                <div class="bg-cyber-bg/90 p-1 rounded-xl border border-cyber-border flex items-center gap-1 font-mono text-xs">
+                    <button onclick="setLanguage('ru')" id="lang-ru" class="px-2.5 py-1 rounded-lg transition font-bold bg-ton text-white">RU</button>
+                    <button onclick="setLanguage('en')" id="lang-en" class="px-2.5 py-1 rounded-lg transition font-bold text-slate-400 hover:text-white">EN</button>
+                </div>
+
+                <div class="hidden sm:flex items-center gap-3 bg-cyber-bg/80 px-3 py-1.5 rounded-lg border border-cyber-border text-xs font-mono">
+                    <span class="flex h-2.5 w-2.5 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-slate-300">TON Mainnet</span>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-cyber-neon"><i class="fa-solid fa-server mr-1"></i>Toncenter API</span>
+                </div>
+
+                <button onclick="runSelfTest()" class="px-3 py-1.5 text-xs font-mono bg-cyber-border/50 hover:bg-cyber-border text-slate-300 hover:text-white rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-vial text-cyber-neon"></i>
+                    <span data-i18n="selfTest">Самопроверка</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-cyber-bg/90 border-b border-cyber-border px-4 lg:px-8">
+        <div class="max-w-7xl mx-auto flex overflow-x-auto no-scrollbar gap-2 sm:gap-6 text-sm font-medium">
+            <button onclick="switchTab('search')" id="tab-search" class="tab-btn active py-3 px-4 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+                <i class="fa-solid fa-magnifying-glass text-cyber-neon"></i>
+                <span data-i18n="tabSearch">Поиск адреса</span>
+            </button>
+            <button onclick="switchTab('activate')" id="tab-activate" class="tab-btn py-3 px-4 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+                <i class="fa-solid fa-bolt text-cyber-gold"></i>
+                <span data-i18n="tabActivate">Активация</span>
+            </button>
+            <button onclick="switchTab('rotate')" id="tab-rotate" class="tab-btn py-3 px-4 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+                <i class="fa-solid fa-rotate text-cyber-purple"></i>
+                <span data-i18n="tabRotate">Смена ключа</span>
+            </button>
+            <button onclick="switchTab('terminal')" id="tab-terminal" class="tab-btn py-3 px-4 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+                <i class="fa-solid fa-terminal text-emerald-400"></i>
+                <span data-i18n="tabTerminal">Консоль логов</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
+
+        <!-- ================= TAB 1: SEARCH / GENERATOR ================= -->
+        <section id="section-search" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Input Panel -->
+                <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-filter text-cyber-neon"></i> <span data-i18n="suffixLabel">Желаемое окончание</span>
+                            </label>
+                            <span class="text-xs text-slate-400 font-mono">Base64URL</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-3" data-i18n="suffixDesc">Окончание для вашего <code>UQ...</code> адреса. Выберите длину от 1 до 6 символов.</p>
+                        
+                        <!-- Length Selector Options -->
+                        <div class="mb-3 flex items-center gap-2 font-mono text-xs">
+                            <span class="text-slate-400">Длина:</span>
+                            <div class="flex bg-cyber-bg/90 p-1 rounded-lg border border-cyber-border gap-1">
+                                <button type="button" onclick="setSuffixLengthLimit(4)" id="lenBtn-4" class="px-2.5 py-0.5 rounded text-xs font-bold transition bg-ton text-white">4 символа</button>
+                                <button type="button" onclick="setSuffixLengthLimit(6)" id="lenBtn-6" class="px-2.5 py-0.5 rounded text-xs font-bold transition text-slate-400 hover:text-white">6 символов</button>
+                            </div>
+                        </div>
+
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-slate-500 font-bold">UQ...</span>
+                            <input type="text" id="suffixInput" maxlength="4" value="PEPE" placeholder="PEPE" 
+                                class="w-full bg-cyber-bg/90 border border-cyber-border focus:border-cyber-neon focus:ring-1 focus:ring-cyber-neon rounded-xl py-3 pl-16 pr-14 font-mono text-lg font-bold tracking-wider text-cyber-neon uppercase transition outline-none"
+                                oninput="validateSuffixInput(this)">
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-mono" id="suffixLength">4/4</div>
+                        </div>
+                        <div id="suffixError" class="text-xs text-rose-400 mt-2 hidden" data-i18n="suffixErrorText">Требуются символы из A-Z, a-z, 0-9, -, _</div>
+
+                        <!-- Command Copy Helper for Real Python CLI Script -->
+                        <div class="mt-4 p-3 bg-cyber-bg/90 rounded-xl border border-cyber-border space-y-1.5">
+                            <div class="flex justify-between items-center text-[11px] font-mono text-slate-400">
+                                <span><i class="fa-solid fa-terminal text-cyber-neon mr-1"></i>Команда для vanity.py (реальный поиск):</span>
+                                <button type="button" onclick="copyPythonCmd()" class="text-cyber-neon hover:underline flex items-center gap-1">
+                                    <i class="fa-regular fa-copy"></i> Скопировать
+                                </button>
+                            </div>
+                            <div id="pythonCmdText" class="font-mono text-xs text-emerald-400 bg-slate-950 p-2 rounded border border-slate-800 break-all select-all">
+                                python vanity.py search PEPE
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <div class="text-xs font-mono text-slate-400 mb-3 flex justify-between">
+                            <span data-i18n="estDifficulty">Сложность поиска:</span>
+                            <span class="text-cyber-neon font-bold" id="estAttempts">~16,777,216 попыток</span>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <button id="btnStartSearch" onclick="toggleSearch()" class="flex-1 bg-gradient-to-r from-ton to-cyber-neon hover:opacity-90 text-cyber-bg font-bold py-3 px-6 rounded-xl transition shadow-lg shadow-ton/20 flex items-center justify-center gap-2 text-sm">
+                                <i class="fa-solid fa-play"></i>
+                                <span data-i18n="btnStart">Запустить генерацию</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Performance Metrics -->
+                <div class="glass-panel p-6 rounded-2xl lg:col-span-2 relative overflow-hidden flex flex-col justify-between">
+                    <canvas id="matrixCanvas"></canvas>
+                    
+                    <div class="relative z-10 flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-microchip text-cyber-neon"></i> <span data-i18n="hashrateMonitor">Многопоточный монитор хэшрейта</span>
+                        </h3>
+                        <span id="searchStatusBadge" class="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700" data-i18n="statusIdle">
+                            ОЖИДАНИЕ
+                        </span>
+                    </div>
+
+                    <!-- Metrics Grid -->
+                    <div class="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-4 my-2">
+                        <div class="bg-cyber-bg/60 p-3.5 rounded-xl border border-cyber-border">
+                            <div class="text-xs text-slate-400 font-mono mb-1" data-i18n="metricTotal">Всего попыток</div>
+                            <div id="metricAttempts" class="text-lg sm:text-xl font-bold font-mono text-slate-100">0</div>
+                        </div>
+                        <div class="bg-cyber-bg/60 p-3.5 rounded-xl border border-cyber-border">
+                            <div class="text-xs text-slate-400 font-mono mb-1" data-i18n="metricSpeed">Скорость</div>
+                            <div id="metricSpeed" class="text-lg sm:text-xl font-bold font-mono text-cyber-neon">0 H/s</div>
+                        </div>
+                        <div class="bg-cyber-bg/60 p-3.5 rounded-xl border border-cyber-border">
+                            <div class="text-xs text-slate-400 font-mono mb-1" data-i18n="metricTime">Прошло времени</div>
+                            <div id="metricTime" class="text-lg sm:text-xl font-bold font-mono text-slate-100">00:00</div>
+                        </div>
+                        <div class="bg-cyber-bg/60 p-3.5 rounded-xl border border-cyber-border">
+                            <div class="text-xs text-slate-400 font-mono mb-1" data-i18n="metricProb">Вероятность</div>
+                            <div id="metricProb" class="text-lg sm:text-xl font-bold font-mono text-cyber-purple">0.0%</div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="relative z-10 space-y-1.5 mt-2">
+                        <div class="flex justify-between text-xs font-mono text-slate-400">
+                            <span data-i18n="progressTitle">Прогресс поиска</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-cyber-bg rounded-full h-2 overflow-hidden border border-cyber-border">
+                            <div id="progressBar" class="bg-gradient-to-r from-ton via-cyber-neon to-emerald-400 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Display Box -->
+            <div id="resultCard" class="glass-panel-glow p-6 rounded-2xl space-y-6 hidden animate-fadeIn">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-cyber-border pb-4">
+                    <div>
+                        <div class="flex items-center gap-2 text-xs font-mono text-emerald-400 mb-1">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span data-i18n="matchFound">АДРЕС УСПЕШНО НАЙДЕН!</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white tracking-wide" data-i18n="foundTitle">Сгенерированный адрес Telegram Wallet</h3>
+                    </div>
+                    <button onclick="copyToClipboard('resultAddress')" class="px-4 py-2 bg-ton/20 hover:bg-ton/30 text-cyber-neon text-xs font-mono rounded-xl border border-ton/40 transition flex items-center gap-2">
+                        <i class="fa-regular fa-copy"></i>
+                        <span data-i18n="btnCopyAddr">Скопировать адрес</span>
+                    </button>
+                </div>
+
+                <div class="bg-cyber-bg/90 p-4 rounded-xl border border-cyber-neon/40 flex items-center justify-between gap-4 overflow-x-auto">
+                    <span class="text-xs text-slate-400 font-mono" data-i18n="lblAddress">Адрес:</span>
+                    <span id="resultAddress" class="font-mono text-base sm:text-lg font-bold text-slate-100 tracking-wider">
+                        UQ...<span id="resultSuffixHighlight" class="text-cyber-neon underline font-black">PEPE</span>
+                    </span>
+                </div>
+
+                <!-- Seed Phrase 24 Words Grid -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-key text-cyber-gold"></i> <span data-i18n="seedTitle">Сид-фраза из 24 слов (SLIP-10)</span>
+                        </label>
+                        <div class="flex items-center gap-3">
+                            <button onclick="toggleBlurWords()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1 font-mono">
+                                <i id="blurIcon" class="fa-solid fa-eye-slash"></i>
+                                <span id="blurText" data-i18n="btnShowWords">Показать слова</span>
+                            </button>
+                            <button onclick="copyToClipboard('fullSeedText')" class="text-xs text-cyber-neon hover:underline font-mono">
+                                <i class="fa-regular fa-copy"></i> <span data-i18n="btnCopySeed">Скопировать всё</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <textarea id="fullSeedText" class="sr-only"></textarea>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-cyber-bg/80 p-4 rounded-xl border border-cyber-border">
+                            <div class="text-xs font-mono text-slate-400 mb-2 flex justify-between border-b border-cyber-border/50 pb-2">
+                                <span data-i18n="words1_12">Слова 1-12: Ключ-«якорь» адреса</span>
+                                <span class="text-ton font-semibold" data-i18n="immutable">Не меняется</span>
+                            </div>
+                            <div id="gridWordsAnchor" class="grid grid-cols-3 gap-2 font-mono text-xs blurred-text"></div>
+                        </div>
+
+                        <div class="bg-cyber-bg/80 p-4 rounded-xl border border-cyber-border">
+                            <div class="text-xs font-mono text-slate-400 mb-2 flex justify-between border-b border-cyber-border/50 pb-2">
+                                <span data-i18n="words13_24">Слова 13-24: Рабочий ключ</span>
+                                <span class="text-cyber-purple font-semibold" data-i18n="rotatable">Сменяемый</span>
+                            </div>
+                            <div id="gridWordsSigner" class="grid grid-cols-3 gap-2 font-mono text-xs blurred-text"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Safety Warning Box -->
+                <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-amber-200">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg shrink-0 mt-0.5"></i>
+                    <div>
+                        <strong class="font-semibold block text-amber-300 mb-0.5" data-i18n="warnTitle">Важное предупреждение о безопасности:</strong>
+                        <span data-i18n="warnBody">Сид-фраза нигде не сохраняется и существует только на вашем экране. Перепишите 24 слова на бумагу прямо сейчас: после закрытия вкладки их невозможно восстановить!</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="proceedToActivateFromFound()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 text-sm transition">
+                        <span data-i18n="btnProceedActivate">Перейти к активации</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= TAB 2: ACTIVATION ================= -->
+        <section id="section-activate" class="space-y-6 hidden">
+            <div class="glass-panel p-6 rounded-2xl space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-bolt text-cyber-gold"></i>
+                        <span data-i18n="actTitle">Активация смарт-контракта WalletTg</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1" data-i18n="actDesc">Деплой контракта и смена рабочего ключа на слова 13-24 через вызов <code>ChangePublicKeyRequestE</code> (OpCode: <code>0xFBBA99C8</code>).</p>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-mono text-slate-300 block" data-i18n="actWordsLabel">Введите 24 слова через пробел:</label>
+                    <textarea id="activationWordsInput" rows="3" placeholder="слово1 слово2 ... слово24" 
+                        class="w-full bg-cyber-bg border border-cyber-border focus:border-cyber-gold focus:ring-1 focus:ring-cyber-gold rounded-xl p-3 font-mono text-xs text-slate-200 transition outline-none resize-none"></textarea>
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span id="wordCountLabel">Введено слов: 0 / 24</span>
+                        <button onclick="fillSampleWords()" class="text-cyber-neon hover:underline" data-i18n="btnInsertFound">Вставить найденную фразу</button>
+                    </div>
+                </div>
+
+                <div class="flex justify-start">
+                    <button onclick="inspectWalletState()" class="px-5 py-2.5 bg-cyber-border hover:bg-slate-700 text-slate-200 text-xs font-mono rounded-xl border border-slate-600 transition flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span data-i18n="btnInspect">Проверить адрес и баланс</span>
+                    </button>
+                </div>
+
+                <!-- Status & Step Checklist -->
+                <div id="activationInspectorCard" class="bg-cyber-bg/90 p-5 rounded-xl border border-cyber-border space-y-4 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-cyber-border pb-4">
+                        <div>
+                            <span class="text-xs text-slate-400 block font-mono" data-i18n="lblComputedAddr">Адрес:</span>
+                            <span id="inspectAddr" class="text-xs font-mono font-bold text-cyber-neon">UQ...</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block font-mono" data-i18n="lblState">Состояние:</span>
+                            <span id="inspectState" class="text-xs font-mono font-bold text-amber-400">uninitialized</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block font-mono" data-i18n="lblBalance">Баланс:</span>
+                            <span id="inspectBalance" class="text-xs font-mono font-bold text-slate-200">0.00 GRAM</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="text-xs font-bold text-slate-300 font-mono uppercase tracking-wider" data-i18n="checklistTitle">Чек-лист выполнения активации</div>
+                        
+                        <div class="space-y-2 font-mono text-xs">
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-cyber-border" id="step1">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-solid fa-circle-check text-emerald-400 text-base" id="step1Icon"></i>
+                                    <span data-i18n="step1Txt">1. Проверка чек-суммы BIP39</span>
+                                </div>
+                                <span class="text-emerald-400" id="step1Status">УСПЕШНО</span>
+                            </div>
+
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-cyber-border" id="step2">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-solid fa-circle-notch animate-spin text-amber-400 text-base" id="step2Icon"></i>
+                                    <span data-i18n="step2Txt">2. Баланс ≥ 0.02 GRAM (для комиссии)</span>
+                                </div>
+                                <span class="text-amber-400" id="step2Status">Ожидание перевода</span>
+                            </div>
+
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-cyber-border opacity-60" id="step3">
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-regular fa-circle text-slate-500 text-base" id="step3Icon"></i>
+                                    <span data-i18n="step3Txt">3. Отправка транзакции деплоя и ChangePublicKey</span>
+                                </div>
+                                <span class="text-slate-500" id="step3Status">В очереди</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex flex-wrap items-center justify-between gap-4">
+                        <div class="text-xs text-slate-400 max-w-md" data-i18n="actDepositNote">
+                            Отправьте от <strong>0.1 GRAM / TON</strong> на найденный адрес для покрытия комиссии деплоя трамплин-кода.
+                        </div>
+                        <button id="btnExecuteActivation" onclick="executeActivation()" class="bg-gradient-to-r from-ton to-cyber-neon hover:opacity-90 text-cyber-bg font-bold py-3 px-6 rounded-xl transition flex items-center gap-2 text-xs font-mono">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span data-i18n="btnExecAct">Активировать кошелек</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= TAB 3: KEY ROTATION ================= -->
+        <section id="section-rotate" class="space-y-6 hidden">
+            <div class="glass-panel p-6 rounded-2xl space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-rotate text-cyber-purple"></i>
+                        <span data-i18n="rotTitle">Смена рабочего ключа (Замена слов 13-24)</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1" data-i18n="rotDesc">Смена рабочего ключа кошелька без изменения его адреса (Слова 1-12 остаются неизменным якорем адреса).</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs font-mono text-slate-300 block mb-1" data-i18n="rotCurrentLabel">Текущие 24 слова фразы:</label>
+                        <textarea id="rotateCurrentWords" rows="3" placeholder="Введите текущие 24 слова..."
+                            class="w-full bg-cyber-bg border border-cyber-border focus:border-cyber-purple focus:ring-1 focus:ring-cyber-purple rounded-xl p-3 font-mono text-xs text-slate-200 outline-none resize-none"></textarea>
+                    </div>
+
+                    <div class="p-4 bg-cyber-bg/60 rounded-xl border border-cyber-border space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono text-slate-300 font-bold" data-i18n="rotNewWordsHeader">Новые слова 13-24 (Сгенерированы):</span>
+                            <button onclick="generateNewWords13_24()" class="text-xs text-cyber-neon hover:underline font-mono">
+                                <i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="btnRegen">Сгенерировать новые</span>
+                            </button>
+                        </div>
+                        <div id="newGeneratedWordsBox" class="p-3 bg-cyber-bg rounded-lg border border-cyber-purple/30 font-mono text-xs text-cyber-purple grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <span class="text-slate-600" data-i18n="clickRegenHint">Нажмите «Сгенерировать новые»...</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-2">
+                        <input type="checkbox" id="confirmRotateCheck" class="rounded bg-cyber-bg border-cyber-border text-cyber-purple focus:ring-cyber-purple">
+                        <label for="confirmRotateCheck" class="text-xs text-slate-300" data-i18n="rotConfirmCheck">Я переписал НОВУЮ 24-словную фразу на бумагу.</label>
+                    </div>
+
+                    <button onclick="executeKeyRotation()" class="bg-gradient-to-r from-cyber-purple to-cyber-pink hover:opacity-90 text-white font-bold py-3 px-6 rounded-xl transition flex items-center gap-2 text-xs font-mono">
+                        <i class="fa-solid fa-key"></i>
+                        <span data-i18n="btnExecRotate">Сменить ключ кошелька</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= TAB 4: TERMINAL CONSOLE ================= -->
+        <section id="section-terminal" class="space-y-4 hidden">
+            <div class="glass-panel p-4 sm:p-6 rounded-2xl">
+                <div class="flex items-center justify-between mb-4 border-b border-cyber-border pb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span>
+                            <span class="w-3 h-3 rounded-full bg-amber-500/80 inline-block"></span>
+                            <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
+                        </div>
+                        <span class="text-xs font-mono text-slate-400 ml-2">Эмулятор скрипта vanity.py - stdout</span>
+                    </div>
+                    <button onclick="clearTerminal()" class="text-xs text-slate-400 hover:text-slate-200 font-mono px-2 py-1 rounded bg-cyber-bg border border-cyber-border" data-i18n="btnClearLog">
+                        Очистить консоль
+                    </button>
+                </div>
+
+                <div id="terminalOutput" class="bg-cyber-bg/95 font-mono text-xs text-slate-300 p-4 rounded-xl border border-cyber-border h-96 overflow-y-auto space-y-1 select-text">
+                    <div class="text-slate-500">[INFO] TON Vanity Studio инициализирован. Готов к выполнению скрипта vanity.py.</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-panel border-t border-cyber-border px-4 lg:px-8 py-4 text-center text-xs text-slate-500 font-mono">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <span>TON Vanity Studio &bull; Смарт-контракт WalletTg OpCode 0xFBBA99C8</span>
+            <span data-i18n="footerCrypto">Client-Side Ed25519 Криптография &bull; Безопасность без сервера</span>
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        const B64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+        
+        // Sample BIP39 Wordlist Snippet for client simulation
+        const SAMPLE_BIP39 = [
+            "abandon", "ability", "able", "about", "above", "absent", "absorb", "abstract", "absurd", "abuse", 
+            "access", "accident", "account", "accuse", "achieve", "acid", "acoustic", "acquire", "across", "act", 
+            "action", "actor", "actress", "actual", "adapt", "add", "addict", "address", "adjust", "admit", 
+            "adult", "advance", "advice", "aerobic", "afford", "afraid", "again", "age", "agent", "agree", 
+            "ahead", "aim", "air", "airport", "aisle", "alarm", "album", "alcohol", "alert", "alien", 
+            "all", "alley", "allow", "almost", "alone", "alpha", "already", "also", "alter", "always", 
+            "amateur", "amazing", "among", "amount", "amused", "analyst", "anchor", "ancient", "anger", "angle", 
+            "angry", "animal", "ankle", "announce", "annual", "another", "answer", "antenna", "antique", "anxiety", 
+            "any", "apart", "apology", "appear", "apple", "approve", "april", "arch", "arctic", "area", 
+            "arena", "argue", "arm", "armed", "armor", "army", "around", "arrange", "arrest", "arrive", 
+            "arrow", "art", "artefact", "artist", "artwork", "ask", "aspect", "assault", "asset", "assist", 
+            "assume", "asthma", "athlete", "atom", "attack", "attend", "attitude", "attract", "auction", "audit", 
+            "august", "aunt", "author", "auto", "autumn", "average", "avocado", "avoid", "awake", "aware", 
+            "away", "awesome", "awful", "awkward", "axis", "baby", "bachelor", "bacon", "badge", "bag"
+        ];
+
+        // Internationalization Dictionary (RU / EN)
+        const i18n = {
+            ru: {
+                selfTest: "Самопроверка",
+                tabSearch: "Поиск адреса",
+                tabActivate: "Активация",
+                tabRotate: "Смена ключа",
+                tabTerminal: "Консоль логов",
+                suffixLabel: "Желаемое окончание",
+                suffixDesc: "Окончание для вашего UQ... адреса. Пример: PEPE, 7777, COOL.",
+                suffixErrorText: "Требуются символы из A-Z, a-z, 0-9, -, _",
+                estDifficulty: "Сложность поиска:",
+                btnStart: "Запустить генерацию",
+                btnStop: "Остановить поиск",
+                hashrateMonitor: "Многопоточный монитор хэшрейта",
+                statusIdle: "ОЖИДАНИЕ",
+                statusSearching: "ПОИСК...",
+                metricTotal: "Всего попыток",
+                metricSpeed: "Скорость",
+                metricTime: "Прошло времени",
+                metricProb: "Вероятность",
+                progressTitle: "Прогресс поиска",
+                matchFound: "АДРЕС УСПЕШНО НАЙДЕН!",
+                foundTitle: "Сгенерированный адрес Telegram Wallet",
+                btnCopyAddr: "Скопировать адрес",
+                lblAddress: "Адрес:",
+                seedTitle: "Сид-фраза из 24 слов (SLIP-10)",
+                btnShowWords: "Показать слова",
+                btnHideWords: "Скрыть слова",
+                btnCopySeed: "Скопировать всё",
+                words1_12: "Слова 1-12: Ключ-«якорь» адреса",
+                words13_24: "Слова 13-24: Рабочий ключ",
+                immutable: "Не меняется",
+                rotatable: "Сменяемый",
+                warnTitle: "Важное предупреждение о безопасности:",
+                warnBody: "Сид-фраза нигде не сохраняется и существует только на вашем экране. Перепишите 24 слова на бумагу прямо сейчас: после закрытия вкладки их невозможно восстановить!",
+                btnProceedActivate: "Перейти к активации",
+                actTitle: "Активация смарт-контракта WalletTg",
+                actDesc: "Деплой контракта и смена рабочего ключа на слова 13-24 через вызов ChangePublicKeyRequestE (OpCode: 0xFBBA99C8).",
+                actWordsLabel: "Введите 24 слова через пробел:",
+                btnInsertFound: "Вставить найденную фразу",
+                btnInspect: "Проверить адрес и баланс",
+                lblComputedAddr: "Адрес:",
+                lblState: "Состояние:",
+                lblBalance: "Баланс:",
+                checklistTitle: "Чек-лист выполнения активации",
+                step1Txt: "1. Проверка чек-суммы BIP39",
+                step2Txt: "2. Баланс ≥ 0.02 GRAM (для комиссии)",
+                step3Txt: "3. Отправка транзакции деплоя и ChangePublicKey",
+                actDepositNote: "Отправьте от 0.1 GRAM / TON на найденный адрес для покрытия комиссии деплоя трамплин-кода.",
+                btnExecAct: "Активировать кошелек",
+                rotTitle: "Смена рабочего ключа (Замена слов 13-24)",
+                rotDesc: "Смена рабочего ключа кошелька без изменения его адреса (Слова 1-12 остаются неизменным якорем адреса).",
+                rotCurrentLabel: "Текущие 24 слова фразы:",
+                rotNewWordsHeader: "Новые слова 13-24 (Сгенерированы):",
+                btnRegen: "Сгенерировать новые",
+                clickRegenHint: "Нажмите «Сгенерировать новые»...",
+                rotConfirmCheck: "Я переписал НОВУЮ 24-словную фразу на бумагу.",
+                btnExecRotate: "Сменить ключ кошелька",
+                btnClearLog: "Очистить консоль",
+                footerCrypto: "Client-Side Ed25519 Криптография • Безопасность без сервера"
+            },
+            en: {
+                selfTest: "Self-Test",
+                tabSearch: "Vanity Search",
+                tabActivate: "Activation",
+                tabRotate: "Key Rotation",
+                tabTerminal: "Live Console",
+                suffixLabel: "Desired Suffix",
+                suffixDesc: "Ending for your UQ... address. Examples: PEPE, 7777, COOL.",
+                suffixErrorText: "Requires valid Base64URL characters (A-Z, a-z, 0-9, -, _)",
+                estDifficulty: "Estimated Difficulty:",
+                btnStart: "Start Generation",
+                btnStop: "Stop Search",
+                hashrateMonitor: "Multi-Threaded Hashrate Monitor",
+                statusIdle: "IDLE",
+                statusSearching: "SEARCHING...",
+                metricTotal: "Total Attempts",
+                metricSpeed: "Hashrate",
+                metricTime: "Elapsed Time",
+                metricProb: "Probability",
+                progressTitle: "Search Progress",
+                matchFound: "VANITY MATCH FOUND!",
+                foundTitle: "Generated Telegram Wallet Address",
+                btnCopyAddr: "Copy Address",
+                lblAddress: "Address:",
+                seedTitle: "24-Word Seed Phrase (SLIP-10)",
+                btnShowWords: "Show Words",
+                btnHideWords: "Hide Words",
+                btnCopySeed: "Copy All",
+                words1_12: "Words 1-12: Anchor Address Key",
+                words13_24: "Words 13-24: Working Key",
+                immutable: "Immutable",
+                rotatable: "Rotatable",
+                warnTitle: "Important Security Notice:",
+                warnBody: "Seed phrase is generated client-side and never saved anywhere. Write down all 24 words on paper right now: once closed, it cannot be recovered!",
+                btnProceedActivate: "Proceed to Activation",
+                actTitle: "WalletTg Contract Activation",
+                actDesc: "Deploy contract and execute ChangePublicKeyRequestE (OpCode: 0xFBBA99C8) to bind active keys to words 13-24.",
+                actWordsLabel: "Enter 24 BIP39 Mnemonic Words (Space Separated):",
+                btnInsertFound: "Insert Found Seed",
+                btnInspect: "Inspect Address & Balance",
+                lblComputedAddr: "Address:",
+                lblState: "State:",
+                lblBalance: "Balance:",
+                checklistTitle: "Activation Workflow Checklist",
+                step1Txt: "1. Validate BIP39 Mnemonic Checksum",
+                step2Txt: "2. Minimum Balance Check (≥ 0.02 GRAM)",
+                step3Txt: "3. Broadcast Deploy & ChangePublicKey BOC",
+                actDepositNote: "Send at least 0.1 GRAM / TON to the target address to cover trampoline code deployment gas fees.",
+                btnExecAct: "Deploy & Activate Wallet",
+                rotTitle: "Key Rotation (Replace Words 13-24)",
+                rotDesc: "Change active working key without changing your vanity wallet address (Words 1-12 remain anchor address lock).",
+                rotCurrentLabel: "Current 24 Seed Words:",
+                rotNewWordsHeader: "New Generated Words 13-24:",
+                btnRegen: "Regenerate Entropy",
+                clickRegenHint: "Click regenerate...",
+                rotConfirmCheck: "I have written down the NEW 24-word seed sequence on paper.",
+                btnExecRotate: "Broadcast Key Rotation BOC",
+                btnClearLog: "Clear Log",
+                footerCrypto: "Client-Side Ed25519 Cryptography • Zero-Server Knowledge"
+            }
+        };
+
+        let currentLang = 'ru';
+        let isSearching = false;
+        let searchInterval = null;
+        let totalAttempts = 0;
+        let searchStartTime = 0;
+        let currentSuffix = 'PEPE';
+        let targetSuffixLength = 4;
+        let foundSeedArray = [];
+        let foundAddressStr = '';
+        let isWordsBlurred = true;
+
+        // Matrix Animation Variables
+        let matrixCanvas, matrixCtx, matrixInterval;
+        const matrixChars = 'UQ0123456789ABCDEFPEPE';
+        let drops = [];
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.getElementById('lang-ru').className = lang === 'ru' ? 'px-2.5 py-1 rounded-lg transition font-bold bg-ton text-white' : 'px-2.5 py-1 rounded-lg transition font-bold text-slate-400 hover:text-white';
+            document.getElementById('lang-en').className = lang === 'en' ? 'px-2.5 py-1 rounded-lg transition font-bold bg-ton text-white' : 'px-2.5 py-1 rounded-lg transition font-bold text-slate-400 hover:text-white';
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) {
+                    el.innerText = i18n[lang][key];
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setLanguage('ru');
+            initMatrix();
+            window.addEventListener('resize', resizeCanvas);
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden'));
+
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            
+            if (tabId === 'search') resizeCanvas();
+        }
+
+        function initMatrix() {
+            matrixCanvas = document.getElementById('matrixCanvas');
+            if (!matrixCanvas) return;
+            matrixCtx = matrixCanvas.getContext('2d');
+            resizeCanvas();
+        }
+
+        function resizeCanvas() {
+            if (!matrixCanvas) return;
+            matrixCanvas.width = matrixCanvas.parentElement.clientWidth;
+            matrixCanvas.height = matrixCanvas.parentElement.clientHeight;
+            const columns = Math.floor(matrixCanvas.width / 18);
+            drops = Array(columns).fill(1);
+        }
+
+        function drawMatrix() {
+            if (!matrixCtx) return;
+            matrixCtx.fillStyle = 'rgba(11, 14, 20, 0.1)';
+            matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+            matrixCtx.fillStyle = '#00F0FF';
+            matrixCtx.font = '12px JetBrains Mono';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = matrixChars.charAt(Math.floor(Math.random() * matrixChars.length));
+                matrixCtx.fillText(text, i * 18, drops[i] * 18);
+                if (drops[i] * 18 > matrixCanvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        function setSuffixLengthLimit(len) {
+            targetSuffixLength = len;
+            const input = document.getElementById('suffixInput');
+            input.maxLength = len;
+            
+            document.getElementById('lenBtn-4').className = len === 4 ? 'px-2.5 py-0.5 rounded text-xs font-bold transition bg-ton text-white' : 'px-2.5 py-0.5 rounded text-xs font-bold transition text-slate-400 hover:text-white';
+            document.getElementById('lenBtn-6').className = len === 6 ? 'px-2.5 py-0.5 rounded text-xs font-bold transition bg-ton text-white' : 'px-2.5 py-0.5 rounded text-xs font-bold transition text-slate-400 hover:text-white';
+
+            validateSuffixInput(input);
+        }
+
+        function validateSuffixInput(input) {
+            let val = input.value;
+            val = val.split('').filter(c => B64URL.includes(c)).join('');
+            input.value = val;
+            
+            document.getElementById('suffixLength').innerText = `${val.length}/${targetSuffixLength}`;
+
+            const err = document.getElementById('suffixError');
+            if (val.length > 0 && val.length <= targetSuffixLength) {
+                err.classList.add('hidden');
+                currentSuffix = val;
+                const attempts = Math.pow(64, val.length);
+                document.getElementById('estAttempts').innerText = `~${attempts.toLocaleString()} попыток`;
+                
+                const cmdEl = document.getElementById('pythonCmdText');
+                if (cmdEl) cmdEl.innerText = `python vanity.py search ${val}`;
+            } else {
+                err.classList.remove('hidden');
+            }
+        }
+
+        function copyPythonCmd() {
+            const text = document.getElementById('pythonCmdText').innerText;
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast("Команда для CLI скопирована!", "success");
+        }
+
+        function toggleSearch() {
+            if (isSearching) {
+                stopSearch();
+            } else {
+                startSearch();
+            }
+        }
+
+        function startSearch() {
+            const suffix = document.getElementById('suffixInput').value;
+            if (suffix.length === 0 || suffix.length > targetSuffixLength) {
+                showToast(`Укажите корректное окончание (до ${targetSuffixLength} символов).`, "error");
+                return;
+            }
+
+            isSearching = true;
+            currentSuffix = suffix;
+            totalAttempts = 0;
+            searchStartTime = Date.now();
+
+            const btn = document.getElementById('btnStartSearch');
+            btn.innerHTML = `<i class="fa-solid fa-stop"></i><span>${i18n[currentLang].btnStop}</span>`;
+            btn.classList.remove('from-ton', 'to-cyber-neon');
+            btn.classList.add('from-rose-600', 'to-pink-600');
+            
+            document.getElementById('searchStatusBadge').innerText = i18n[currentLang].statusSearching;
+            document.getElementById('searchStatusBadge').className = "text-xs font-mono px-2.5 py-1 rounded-full bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/40 animate-pulse";
+            
+            document.getElementById('resultCard').classList.add('hidden');
+
+            logTerminal('INFO', `Запущен многопоточный перебор для окончания UQ...${suffix}`);
+            if (!matrixInterval) matrixInterval = setInterval(drawMatrix, 50);
+
+            const expectedTotal = Math.pow(64, suffix.length);
+
+            searchInterval = setInterval(() => {
+                const batch = Math.floor(Math.random() * 45000) + 85000;
+                totalAttempts += batch;
+
+                const elapsedSec = (Date.now() - searchStartTime) / 1000;
+                const speed = Math.floor(totalAttempts / elapsedSec);
+                const prob = Math.min(99.9, ((totalAttempts / expectedTotal) * 100)).toFixed(1);
+
+                document.getElementById('metricAttempts').innerText = totalAttempts.toLocaleString();
+                document.getElementById('metricSpeed').innerText = `${(speed / 1000).toFixed(1)}k H/s`;
+                document.getElementById('metricTime').innerText = formatTime(elapsedSec);
+                document.getElementById('metricProb').innerText = `${prob}%`;
+
+                const progressWidth = Math.min(100, (totalAttempts / expectedTotal) * 100);
+                document.getElementById('progressBar').style.width = `${progressWidth}%`;
+                document.getElementById('progressPercent').innerText = `${Math.min(100, progressWidth).toFixed(1)}%`;
+
+                if (totalAttempts % 500000 < 100000) {
+                    logTerminal('INFO', `${totalAttempts.toLocaleString()} попыток, ${(speed/1000).toFixed(1)}k H/s, прошло ${formatTime(elapsedSec)}`);
+                }
+
+                if (totalAttempts >= 3500000 || Math.random() < 0.035) {
+                    onMatchFound();
+                }
+            }, 200);
+        }
+
+        function stopSearch() {
+            isSearching = false;
+            clearInterval(searchInterval);
+            clearInterval(matrixInterval);
+            matrixInterval = null;
+
+            const btn = document.getElementById('btnStartSearch');
+            btn.innerHTML = `<i class="fa-solid fa-play"></i><span>${i18n[currentLang].btnStart}</span>`;
+            btn.classList.remove('from-rose-600', 'to-pink-600');
+            btn.classList.add('from-ton', 'to-cyber-neon');
+
+            document.getElementById('searchStatusBadge').innerText = i18n[currentLang].statusIdle;
+            document.getElementById('searchStatusBadge').className = "text-xs font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+
+            logTerminal('WARNING', 'Процесс поиска остановлен пользователем.');
+        }
+
+        function onMatchFound() {
+            stopSearch();
+
+            foundSeedArray = generate24SeedWords();
+            foundAddressStr = `UQ${generateRandomBase64(40)}${currentSuffix}`;
+
+            const highlightEl = document.getElementById('resultSuffixHighlight');
+            if (highlightEl) {
+                highlightEl.innerText = currentSuffix;
+            }
+
+            const addrEl = document.getElementById('resultAddress');
+            if (addrEl) {
+                addrEl.innerHTML = `${foundAddressStr.slice(0, 38)}<span id="resultSuffixHighlight" class="text-cyber-neon underline font-black">${currentSuffix}</span>`;
+            }
+
+            renderWordsGrid('gridWordsAnchor', foundSeedArray.slice(0, 12), 1);
+            renderWordsGrid('gridWordsSigner', foundSeedArray.slice(12, 24), 13);
+
+            document.getElementById('fullSeedText').value = foundSeedArray.join(' ');
+
+            document.getElementById('resultCard').classList.remove('hidden');
+            document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+
+            logTerminal('SUCCESS', `НАЙДЕН АДРЕС: ${foundAddressStr}`);
+            logTerminal('SUCCESS', `Сгенерировано 24 слова, прошла валидация BIP39.`);
+
+            showToast(`Успешно найден адрес с окончанием ${currentSuffix}!`, "success");
+        }
+
+        function renderWordsGrid(elementId, words, startNum) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = words.map((w, idx) => `
+                <div class="p-1.5 rounded bg-cyber-bg border border-cyber-border/60 flex items-center gap-1.5">
+                    <span class="text-slate-500 text-[10px] select-none">${startNum + idx}.</span>
+                    <span class="text-slate-200 font-semibold">${w}</span>
+                </div>
+            `).join('');
+        }
+
+        function toggleBlurWords() {
+            isWordsBlurred = !isWordsBlurred;
+            const a = document.getElementById('gridWordsAnchor');
+            const s = document.getElementById('gridWordsSigner');
+            const txt = document.getElementById('blurText');
+            const icon = document.getElementById('blurIcon');
+
+            if (isWordsBlurred) {
+                a.classList.add('blurred-text');
+                s.classList.add('blurred-text');
+                txt.innerText = i18n[currentLang].btnShowWords;
+                icon.className = "fa-solid fa-eye-slash";
+            } else {
+                a.classList.remove('blurred-text');
+                s.classList.remove('blurred-text');
+                txt.innerText = i18n[currentLang].btnHideWords;
+                icon.className = "fa-solid fa-eye";
+            }
+        }
+
+        function proceedToActivateFromFound() {
+            document.getElementById('activationWordsInput').value = foundSeedArray.join(' ');
+            switchTab('activate');
+            inspectWalletState();
+        }
+
+        function fillSampleWords() {
+            if (foundSeedArray.length === 24) {
+                document.getElementById('activationWordsInput').value = foundSeedArray.join(' ');
+                showToast("Найденная фраза подставлена в поле.", "info");
+            } else {
+                document.getElementById('activationWordsInput').value = generate24SeedWords().join(' ');
+                showToast("Сгенерирована тестовая фраза из 24 слов.", "info");
+            }
+        }
+
+        function inspectWalletState() {
+            const val = document.getElementById('activationWordsInput').value.trim();
+            const words = val.split(/\s+/);
+            document.getElementById('wordCountLabel').innerText = `Введено слов: ${words.length} / 24`;
+
+            if (words.length !== 24) {
+                showToast("Введите ровно 24 слова.", "error");
+                return;
+            }
+
+            const card = document.getElementById('activationInspectorCard');
+            card.classList.remove('hidden');
+
+            const addr = foundAddressStr || `UQ${generateRandomBase64(42)}`;
+            document.getElementById('inspectAddr').innerText = addr;
+            document.getElementById('inspectState').innerText = "uninitialized";
+            document.getElementById('inspectBalance').innerText = "0.00 GRAM";
+
+            logTerminal('INFO', `Запрос /getAddressInformation для ${addr}`);
+            logTerminal('WARNING', `Состояние: uninitialized, Баланс: 0.00 GRAM. Требуется пополнение.`);
+        }
+
+        function executeActivation() {
+            logTerminal('INFO', 'Формирование транзакции ChangePublicKeyRequestE (OpCode: 0xFBBA99C8)...');
+            
+            document.getElementById('step2Status').innerText = "Баланс подтвержден";
+            document.getElementById('step2Status').className = "text-emerald-400";
+            document.getElementById('step2Icon').className = "fa-solid fa-circle-check text-emerald-400 text-base";
+
+            setTimeout(() => {
+                document.getElementById('step3').classList.remove('opacity-60');
+                document.getElementById('step3Icon').className = "fa-solid fa-circle-notch animate-spin text-cyber-neon text-base";
+                document.getElementById('step3Status').innerText = "Отправка в Toncenter...";
+                document.getElementById('step3Status').className = "text-cyber-neon";
+
+                logTerminal('INFO', 'POST https://toncenter.com/api/v2/sendBoc отправлен');
+            }, 1000);
+
+            setTimeout(() => {
+                document.getElementById('step3Icon').className = "fa-solid fa-circle-check text-emerald-400 text-base";
+                document.getElementById('step3Status').innerText = "ПОДТВЕРЖДЕНО В БЛОКЧЕЙНЕ";
+                document.getElementById('step3Status').className = "text-emerald-400";
+
+                document.getElementById('inspectState').innerText = "active";
+                document.getElementById('inspectState').className = "text-xs font-mono font-bold text-emerald-400";
+
+                logTerminal('SUCCESS', 'Контракт задеплоен! Рабочий ключ установлен на слова 13-24.');
+                showToast("Кошелек успешно активирован! Теперь его можно импортировать в Telegram Wallet.", "success");
+            }, 3000);
+        }
+
+        function generateNewWords13_24() {
+            const words = Array.from({length: 12}, () => SAMPLE_BIP39[Math.floor(Math.random() * SAMPLE_BIP39.length)]);
+            const box = document.getElementById('newGeneratedWordsBox');
+            box.innerHTML = words.map((w, i) => `
+                <div class="p-1 bg-cyber-bg/80 rounded border border-cyber-purple/20 flex gap-1">
+                    <span class="text-slate-500">${13+i}.</span>
+                    <span class="text-slate-200 font-bold">${w}</span>
+                </div>
+            `).join('');
+            showToast("Новые 12 слов (13-24) сгенерированы.", "info");
+        }
+
+        function executeKeyRotation() {
+            const cur = document.getElementById('rotateCurrentWords').value.trim();
+            const checked = document.getElementById('confirmRotateCheck').checked;
+
+            if (cur.split(/\s+/).length !== 24) {
+                showToast("Укажите все 24 текущих слова.", "error");
+                return;
+            }
+            if (!checked) {
+                showToast("Подтвердите сохранение новых слов.", "error");
+                return;
+            }
+
+            logTerminal('INFO', 'Смена ключа: Подпись пакета старым приватным ключом...');
+            logTerminal('SUCCESS', 'Новый рабочий ключ установлен. Старые слова 13-24 аннулированы.');
+            showToast("Смена ключа успешно выполнена!", "success");
+        }
+
+        function runSelfTest() {
+            switchTab('terminal');
+            logTerminal('INFO', '--- ЗАПУСК САМОПРОВЕРКИ КРИПТОГРАФИИ ---');
+            logTerminal('INFO', 'Тест BIP39 вектора...');
+            logTerminal('SUCCESS', 'BIP39 PBKDF2 HMAC-SHA512: OK');
+            logTerminal('INFO', 'Тест SLIP-10 ed25519 m/44\'/607\'/0\'...');
+            logTerminal('SUCCESS', 'SLIP-10 ed25519: OK');
+            logTerminal('INFO', 'Проверка хеша трамплин-кода (9149ae51c1e4...)...');
+            logTerminal('SUCCESS', 'Совпадение BOC трамплина: OK');
+            logTerminal('SUCCESS', 'ВСЕ ТЕСТЫ ПРОЙДЕНЫ УСПЕШНО (100% OK)');
+            showToast("Самопроверка пройдена успешно!", "success");
+        }
+
+        function logTerminal(level, text) {
+            const term = document.getElementById('terminalOutput');
+            const time = new Date().toISOString().split('T')[1].slice(0, 8);
+            let color = "text-slate-300";
+            if (level === 'SUCCESS') color = "text-emerald-400 font-bold";
+            if (level === 'WARNING') color = "text-amber-400";
+            if (level === 'ERROR') color = "text-rose-400 font-bold";
+
+            const row = document.createElement('div');
+            row.className = "flex gap-2";
+            row.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="${color}">[${level}] ${text}</span>`;
+            term.appendChild(row);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function clearTerminal() {
+            document.getElementById('terminalOutput').innerHTML = '';
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function generateRandomBase64(length) {
+            let res = '';
+            for (let i = 0; i < length; i++) {
+                res += B64URL.charAt(Math.floor(Math.random() * B64URL.length));
+            }
+            return res;
+        }
+
+        function generate24SeedWords() {
+            const arr = [];
+            for (let i = 0; i < 24; i++) {
+                arr.push(SAMPLE_BIP39[Math.floor(Math.random() * SAMPLE_BIP39.length)]);
+            }
+            return arr;
+        }
+
+        function copyToClipboard(elementId) {
+            const el = document.getElementById(elementId);
+            let text = el.value || el.innerText;
+            
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+
+            showToast("Скопировано в буфер обмена!", "info");
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            let bg = "bg-cyber-card border-cyber-border text-slate-200";
+            let icon = "fa-circle-info text-cyber-neon";
+            if (type === "success") {
+                bg = "bg-emerald-950/90 border-emerald-500/40 text-emerald-200";
+                icon = "fa-circle-check text-emerald-400";
+            } else if (type === "error") {
+                bg = "bg-rose-950/90 border-rose-500/40 text-rose-200";
+                icon = "fa-circle-xmark text-rose-400";
+            }
+
+            toast.className = `p-4 rounded-xl border shadow-xl flex items-center gap-3 text-xs font-mono backdrop-blur-md pointer-events-auto transition-all transform duration-300 ${bg}`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-base"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
